@@ -42,3 +42,16 @@ jobs:
           python -m py_compile src/api/app.py
           python -m py_compile src/model/train.py
           python -m py_compile src/model/predict.py
+          python -m py_compile src/data/data_preprocessing.py
+
+      - name: Basic import test
+        run: |
+          python - <<'EOF'
+          try:
+              from src.data.data_preprocessing import DataPreprocessor
+              from src.model.train import ModelTrainer
+              print('✅ All imports successful')
+          except Exception as e:
+              print(f'❌ Import error: {e}')
+              exit(1)
+          EOF

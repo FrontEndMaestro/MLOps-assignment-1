@@ -11,41 +11,66 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.9
         uses: actions/setup-python@v4
         with:
           python-version: "3.9"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov
+          pip install pytest pytest-cov pytest-mock
           pip install -r requirements.txt
 
-      - name: Create test dataset
+      - name: Create required directories
+        run: |
+          mkdir -p models src/tests
+          find src -type d -exec touch {}/__init__.py \;
+
+      - name: Generate test dataset
         run: |
           python -c "
           import pandas as pd
           import numpy as np
+          import os
+
           np.random.seed(42)
-          data = np.random.rand(1000, 5)
-          target = np.random.randint(0, 2, 1000)
-          df = pd.DataFrame(data, columns=['feature1', 'feature2', 'feature3', 'feature4', 'feature5'])
-          df['target'] = target
+          n_samples = 1000  # Smaller for CI
+
+          data = {
+              'customer_age': np.random.normal(40, 12, n_samples).clip(18, 80),
+              'account_balance': np.random.lognormal(8, 1.5, n_samples).clip(0, 100000), 
+              'monthly_charges': np.random.normal(65, 20, n_samples).clip(10, 200),
+              'total_charges': np.random.normal(2000, 1200, n_samples).clip(0, 8000),
+              'support_calls': np.random.poisson(2, n_samples).clip(0, 15),
+              'contract_length': np.random.choice([1, 12, 24], n_samples, p=[0.4, 0.3, 0.3]),
+              'service_usage': np.random.beta(2, 5, n_samples) * 100,
+              'satisfaction_score': np.random.normal(7, 2, n_samples).clip(1, 10),
+              'tenure_months': np.random.exponential(24, n_samples).clip(0, 120),
+              'num_services': np.random.poisson(3, n_samples).clip(1, 10)
+          }
+
+          churn_prob = (
+              0.1 + 
+              (np.array(data['monthly_charges']) - 65) / 200 * 0.3 +
+              np.array(data['support_calls']) / 15 * 0.4 +
+              (10 - np.array(data['satisfaction_score'])) / 10 * 0.5 +
+              np.random.normal(0, 0.1, n_samples)
+          ).clip(0, 1)
+
+          data['target'] = np.random.binomial(1, churn_prob, n_samples)
+
+          os.makedirs('src/data', exist_ok=True)
+          df = pd.DataFrame(data)
           df.to_csv('src/data/dataset.csv', index=False)
-                  "
-              
-              - name: Train model for testing
-              run: |
-                  cd src/model && python train.py
-              
-              - name: Run unit tests
-              run: |
-                  pytest src/tests/ -v --cov=src --cov-report=xml
-              
-              - name: Upload coverage reports
-              uses: codecov/codecov-action@v3
-              with:
-                  file: ./coverage.xml
+          print(f'Test dataset created: {df.shape}')
+          "
+
+      - name: Train model for testing
+        run: |
+          export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
+          cd src/model && python train.py

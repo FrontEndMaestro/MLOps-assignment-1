@@ -1,0 +1,7 @@
+# Global code owners (admin approval required)
+* @FrontEndMaestro
+
+# Specific paths
+/src/model/ @FrontEndMaestro
+/Dockerfile @FrontEndMaestro
+/Jenkinsfile @FrontEndMaestro

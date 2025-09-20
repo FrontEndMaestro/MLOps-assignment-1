@@ -19,7 +19,7 @@ class ModelTrainer:
     def train_model(self, data_path):
         """Train the ML model"""
         df = self.load_data(data_path)
-        
+        df = df.dropna()
         # Assuming last column is target
         X = df.iloc[:, :-1]
         y = df.iloc[:, -1]
